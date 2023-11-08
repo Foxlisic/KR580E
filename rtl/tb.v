@@ -8,41 +8,24 @@ module tb;
 
 // ---------------------------------------------------------------------
 
-reg         clk;
+reg         clk, clock;
 always #0.5 clk         = ~clk;
+always #2.0 clock       = ~clock;
 
-initial begin clk = 1; #20 pin_intr = 1'b1; #2000 $finish; end
+initial begin clk = 1; clock = 0; #20 pin_intr = 1'b0; #2000 $finish; end
 initial begin $dumpfile("tb.vcd"); $dumpvars(0, tb); end
 
 // ---------------------------------------------------------------------
 
-reg  [ 1:0] clock_divider = 0;
-wire        clock_cpu = clock_divider[1];
+reg  [ 7:0] memory[65536];
+reg  [ 7:0] in;
+wire [ 7:0] out;
+wire [15:0] address;
 
-reg  [ 7:0] memory[65536];            // 64 kb памяти
-reg  [ 7:0] bus_data_i = 8'h00;       // То, что читается из памяти
-wire [ 7:0] bus_data_o;               // То, что пишется в память
-wire [15:0] bus_addr;
-
-initial $readmemh("bios/mon.hex", memory, 16'h0000);
+initial $readmemh("tb.hex", memory, 16'h0000);
 
 /* Формируется логика чтения и записи в память */
-always @(posedge clk) begin
-
-    bus_data_i <= memory[ bus_addr ];
-
-    if (ena_wrmem) begin
-        memory[ bus_addr ] <= bus_data_o;
-    end
-
-end
-
-/* Тактовая частота в 25 мгц -- стандарт */
-always @(posedge clk) begin
-
-    clock_divider <= clock_divider + 1'b1;
-
-end
+always @(posedge clk) begin in <= memory[address]; if (we) memory[address] <= out; end
 
 wire [7:0] pin_pa;
 wire [7:0] pin_pi = 0;
@@ -54,17 +37,15 @@ reg        pin_intr = 1'b0;
 
 kr580 cpu(
 
-    .clock      (clock_cpu),
+    .clock      (clock),
     .reset_n    (1'b1),
     .locked     (1'b1),
-    .in         (bus_data_i),
-    .address    (bus_addr),
-    .we         (ena_wrmem),
-    .out        (bus_data_o),
-    .pin_pa     (pin_pa),
-    .pin_pi     (pin_pi),
-    .pin_po     (pin_po),
-    .pin_pw     (pin_pw),
+    .in         (in),
+    .address    (address),
+    .we         (we),
+    .out        (out),
+    // ---
+    .pw         (pin_pw),
     .intr       (pin_intr)
 );
 

@@ -5,15 +5,11 @@ module kr580(
     input                reset_n,
     input                locked,
     input        [ 7:0]  in,
-    output       [15:0]  address,         // Указатель на адрес
-    output  reg          we,       // Разрешить запись (высокий уровень)
+    output       [15:0]  address,   // Указатель на адрес
+    output  reg          we,        // Разрешить запись (высокий уровень)
+    output  reg          pw,        // Port Write
     output  reg  [ 7:0]  out,
 
-    // Порты
-    output  reg  [ 7:0]  pin_pa,
-    input   wire [ 7:0]  pin_pi,
-    output  reg  [ 7:0]  pin_po,
-    output  reg          pin_pw,
 
     // Interrupt
     input   wire         intr
@@ -49,10 +45,8 @@ localparam
 
 initial begin
 
-    we = 0;
-    out   = 0;
-    pin_pa  = 0;
-    pin_po  = 0;
+    we      = 0;
+    out     = 0;
 
 end
 
@@ -69,13 +63,13 @@ reg  [15:0] cp      = 0;
 reg         alt     = 1'b0;     // =0 pc  =1 cp
 
 // Регистры общего назначения
-reg  [15:0] bc = 16'h0000, de = 16'h0000, hl = 16'h0000;
-reg  [15:0] pc = 16'h0000, sp = 16'h0000;
-reg  [ 1:0] im = 2'b00;
-reg  [ 7:0] i  = 8'h00,
-            a  = 8'h00,
-            f  = 8'b01000000;
-                //  SZ A P C
+reg  [15:0] bc  = 16'h0000, de = 16'h0000, hl = 16'h0000;
+reg  [15:0] pc  = 16'h0000, sp = 16'h0000;
+reg  [ 1:0] im  = 2'b00;
+reg  [ 7:0] i   = 8'h00,
+            a   = 8'h00,
+            f   = 8'b01000000;
+                 //  SZ A P C
 
 // Сохраненный опкод
 wire [ 7:0] opcode          = t ? latch : in;
@@ -85,15 +79,15 @@ reg         irq             = 1'b0;     // Исполнение запроса I
 reg  [ 2:0] irq_t           = 1'b0;     // Шаг исполнения
 
 // Управление записью в регистры
-reg         _b = 1'b0;       // Сигнал на запись 8 битного регистра
-reg         _w = 1'b0;       // Сигнал на запись 16 битного регистра (_u:reg_v)
-reg  [ 2:0] _n = 3'h0;       // Номер регистра
-reg  [ 7:0] _l = 8'h00;      // Что писать
-reg  [ 7:0] _u = 8'h00;      // Что писать
-reg  [ 7:0] _f = 8'h00;      // Сохранение флага
-reg  [ 7:0] _r8;             // _r8  = regs8 [ _n ]
-reg  [15:0] _r16;            // _r16 = regs16[ _n ]
-reg         fw;                 // Писать флаги
+reg         _b = 1'b0;      // Сигнал на запись 8 битного регистра
+reg         _w = 1'b0;      // Сигнал на запись 16 битного регистра (_u:reg_v)
+reg  [ 2:0] _n = 3'h0;      // Номер регистра
+reg  [ 7:0] _l = 8'h00;     // Что писать
+reg  [ 7:0] _u = 8'h00;     // Что писать
+reg  [ 7:0] _f = 8'h00;     // Сохранение флага
+reg  [ 7:0] _r8;            // _r8  = regs8 [ _n ]
+reg  [15:0] _r16;           // _r16 = regs16[ _n ]
+reg         fw;             // Писать флаги
 reg         ex_de_hl;
 
 // Определение условий
@@ -123,7 +117,7 @@ if (locked) begin
     _b       <= 1'b0;
     _w       <= 1'b0;
     we       <= 1'b0;
-    pin_pw   <= 1'b0;
+    pw       <= 1'b0;
     halt     <= 1'b0;
     fw       <= 1'b0;
     ex_de_hl <= 1'b0;
@@ -145,7 +139,7 @@ if (locked) begin
     // Исполнение опкодов
     else begin
 
-        t  <= t  + 1;
+        t <= t + 1;
 
         // Запись опкода на первом такте
         if (t == 0) begin
@@ -413,15 +407,15 @@ if (locked) begin
         // 2 OUT (*), A
         8'b11_010_011: case (t)
 
-            1: begin t <= 0; pc <= pc + 1; pin_pa <= in; pin_po <= a; pin_pw <= 1; end
+            1: begin t <= 0; pc <= pc + 1; cp <= in; alt <= 1; out <= a; pw <= 1; end
 
         endcase
 
         // 3 IN  A, (*)
         8'b11_011_011: case (t)
 
-            1: begin t <= 2; pc <= pc + 1; pin_pa <= in; end
-            2: begin t <= 0; _l <= pin_pi; _b <= 1; _n <= `REG_A; end
+            1: begin t <= 2; pc <= pc + 1; cp <= in; alt <= 1; end
+            2: begin t <= 0; _l <= in; _b <= 1; _n <= `REG_A; end
 
         endcase
 
@@ -558,9 +552,9 @@ always @* begin
 
 end
 
-// ---------------------------------------------------------------------
+// -----------------------------------------------------------------------------
 // Работа с регистрами
-// ---------------------------------------------------------------------
+// -----------------------------------------------------------------------------
 
 // Чтение
 always @* begin
@@ -576,47 +570,39 @@ always @* begin
     endcase
 
     case (_n)
-    3'h0: _r16 = bc;
-    3'h1: _r16 = de;
-    3'h2: _r16 = hl;
-    3'h3: _r16 = sp;
+    3'h0: _r16 = bc; 3'h1: _r16 = de;
+    3'h2: _r16 = hl; 3'h3: _r16 = sp;
     3'h4: _r16 = {a, f};
     endcase
 
 end
 
+// -----------------------------------------------------------------------------
 // Запись в регистры
+// -----------------------------------------------------------------------------
+
 always @(negedge clock)
 begin
 
-    if   (ex_de_hl) begin de <= hl; hl <= de; end
-    else if (_w) begin
+    if (ex_de_hl) begin de <= hl; hl <= de; end
+    // Запись в 16-битные регистры
+    else if (_w) case (_n)
 
-        case (_n)
+        3'h0: bc <= {_u, _l};
+        3'h1: de <= {_u, _l};
+        3'h2: hl <= {_u, _l};
+        3'h3: sp <= {_u, _l};
 
-            3'h0: bc <= {_u, _l};
-            3'h1: de <= {_u, _l};
-            3'h2: hl <= {_u, _l};
-            3'h3: sp <= {_u, _l};
+    endcase
+    // Запись в 8 битные регистры
+    else if (_b) case (_n)
 
-        endcase
+        3'h0: bc[15:8] <= _l; 3'h1: bc[ 7:0] <= _l;
+        3'h2: de[15:8] <= _l; 3'h3: de[ 7:0] <= _l;
+        3'h4: hl[15:8] <= _l; 3'h5: hl[ 7:0] <= _l;
+        3'h7: a <= _l;
 
-    end
-    else if (_b) begin
-
-        case (_n)
-
-            3'h0: bc[15:8] <= _l;
-            3'h1: bc[ 7:0] <= _l;
-            3'h2: de[15:8] <= _l;
-            3'h3: de[ 7:0] <= _l;
-            3'h4: hl[15:8] <= _l;
-            3'h5: hl[ 7:0] <= _l;
-            3'h7: a <= _l;
-
-        endcase
-
-    end
+    endcase
 
     // Сохранение флагов
     if (fw) f <= _f;
