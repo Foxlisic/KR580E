@@ -12,7 +12,7 @@ reg         clk, clock;
 always #0.5 clk         = ~clk;
 always #2.0 clock       = ~clock;
 
-initial begin clk = 1; clock = 0; #20 pin_intr = 1'b0; #2000 $finish; end
+initial begin clk = 1; clock = 0; #20 pin_intr = 1'b0; #2500 $finish; end
 initial begin $dumpfile("tb.vcd"); $dumpvars(0, tb); end
 
 // ---------------------------------------------------------------------

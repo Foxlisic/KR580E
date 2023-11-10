@@ -6,9 +6,11 @@
     <style>
         table { border-collapse: collapse; width: 100%; }
         th, td { border: 1px solid #ccc; padding: 4px 8px; margin: 0; font-family: Monospace; font-size: 14px; }
+        th { background: #eee; }
         td { width: 6%; vertical-align: top; }
         td b { display: block; }
         td.ok { background: #cfc; }
+        td.none { background: #ddd; }
     </style>
 </head>
 <body>
@@ -24,16 +26,16 @@
             <th>0</th>
             <!--0--><td class="ok"><b>NOP</b></td>
             <!--1--><td class="ok"><b>LD</b>BC,nn</td>
-            <!--2--><td><b></b></td>
-            <!--3--><td><b></b></td>
-            <!--4--><td><b></b></td>
+            <!--2--><td class="ok"><b>LD</b>(BC),A</td>
+            <!--3--><td class="ok"><b>INC</b>BC</td>
+            <!--4--><td class="ok"><b>INC</b>B</td>
             <!--5--><td><b></b></td>
             <!--6--><td><b></b></td>
             <!--7--><td><b></b></td>
-            <!--8--><td><b></b></td>
-            <!--9--><td><b></b></td>
-            <!--A--><td><b></b></td>
-            <!--B--><td><b></b></td>
+            <!--8--><td class="none"><b></b></td>
+            <!--9--><td class="ok"><b>ADD</b>HL,BC</td>
+            <!--A--><td class="ok"><b>LD</b>A,(BC)</td>
+            <!--3--><td class="ok"><b>DEC</b>BC</td>
             <!--C--><td><b></b></td>
             <!--D--><td><b></b></td>
             <!--E--><td><b></b></td>
@@ -41,18 +43,18 @@
         </tr>
         <tr><!-- 10 -->
             <th>1</th>
-            <!--0--><td><b></b></td>
+            <!--0--><td class="ok"><b>DJNZ</b>*</td>
             <!--1--><td class="ok"><b>LD</b>DE,nn</td>
-            <!--2--><td><b></b></td>
-            <!--3--><td><b></b></td>
+            <!--2--><td class="ok"><b>LD</b>(DE),A</td>
+            <!--3--><td class="ok"><b>INC</b>DE</td>
             <!--4--><td><b></b></td>
             <!--5--><td><b></b></td>
             <!--6--><td><b></b></td>
             <!--7--><td><b></b></td>
-            <!--8--><td><b></b></td>
-            <!--9--><td><b></b></td>
-            <!--A--><td><b></b></td>
-            <!--B--><td><b></b></td>
+            <!--8--><td class="ok"><b>JR</b>*</td>
+            <!--9--><td class="ok"><b>ADD</b>HL,DE</td>
+            <!--A--><td class="ok"><b>LD</b>A,(DE)</td>
+            <!--3--><td class="ok"><b>DEC</b>DE</td>
             <!--C--><td><b></b></td>
             <!--D--><td><b></b></td>
             <!--E--><td><b></b></td>
@@ -60,18 +62,18 @@
         </tr>
         <tr><!-- 20 -->
             <th>2</th>
-            <!--0--><td><b></b></td>
+            <!--0--><td class="ok"><b>JR</b>NZ,*</td>
             <!--1--><td class="ok"><b>LD</b>HL,nn</td>
-            <!--2--><td><b></b></td>
-            <!--3--><td><b></b></td>
+            <!--2--><td class="ok"><b>LD</b>(**),HL</td>
+            <!--3--><td class="ok"><b>INC</b>HL</td>
             <!--4--><td><b></b></td>
             <!--5--><td><b></b></td>
             <!--6--><td><b></b></td>
             <!--7--><td><b></b></td>
-            <!--8--><td><b></b></td>
-            <!--9--><td><b></b></td>
-            <!--A--><td><b></b></td>
-            <!--B--><td><b></b></td>
+            <!--8--><td class="ok"><b>JR</b>Z,*</td>
+            <!--9--><td class="ok"><b>ADD</b>HL,HL</td>
+            <!--A--><td class="ok"><b>LD</b>HL,(**)</td>
+            <!--3--><td class="ok"><b>DEC</b>HL</td>
             <!--C--><td><b></b></td>
             <!--D--><td><b></b></td>
             <!--E--><td><b></b></td>
@@ -79,18 +81,18 @@
         </tr>
         <tr><!-- 30 -->
             <th>3</th>
-            <!--0--><td><b></b></td>
+            <!--0--><td class="ok"><b>JR</b>NC,*</td>
             <!--1--><td class="ok"><b>LD</b>SP,nn</td>
-            <!--2--><td><b></b></td>
-            <!--3--><td><b></b></td>
+            <!--2--><td class="ok"><b>LD</b>(**),A</td>
+            <!--3--><td class="ok"><b>INC</b>SP</td>
             <!--4--><td><b></b></td>
             <!--5--><td><b></b></td>
             <!--6--><td><b></b></td>
             <!--7--><td><b></b></td>
-            <!--8--><td><b></b></td>
-            <!--9--><td><b></b></td>
-            <!--A--><td><b></b></td>
-            <!--B--><td><b></b></td>
+            <!--8--><td class="ok"><b>JR</b>C,*</td>
+            <!--9--><td class="ok"><b>ADD</b>HL,SP</td>
+            <!--2--><td class="ok"><b>LD</b>A,(**)</td>
+            <!--3--><td class="ok"><b>DEC</b>SP</td>
             <!--C--><td><b></b></td>
             <!--D--><td><b></b></td>
             <!--E--><td><b></b></td>
