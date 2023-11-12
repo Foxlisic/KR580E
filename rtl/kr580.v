@@ -32,7 +32,9 @@ localparam CF = 0, NF = 1, PF = 2, AF = 4, ZF = 6, SF = 7;
 
 // Специальные
 localparam
-    EX_DE_HL = 1, EX_AF = 2;
+    EX_DE_HL = 1, EX_AF  = 2,
+    INCSP2   = 3, DECSP2 = 4,
+    EXX      = 5;
 
 initial begin we  = 0; out = 0; end
 
@@ -48,13 +50,13 @@ reg  [15:0] cp      = 0;
 reg         alt     = 1'b0;     // =0 pc  =1 cp
 
 // Регистры общего назначения
-reg  [15:0] bc  = 16'hAFB1, de = 16'h0305, hl = 16'h0003;
-reg  [15:0] pc  = 16'h0000, sp = 16'h0000;
+reg  [15:0] bc  = 16'hAFB1, de  = 16'h0305, hl  = 16'hBEEF;
+reg  [15:0] bc_ = 16'h0000, de_ = 16'h0000, hl_ = 16'h0000;
+reg  [15:0] pc  = 16'h0000, sp  = 16'h0001;
 reg  [ 1:0] im  = 2'b00;
 reg  [ 7:0] i   = 8'h00,
-            a   = 8'h0A,
-            a_  = 8'h00, // AUX A
-            f   = 8'b00000000;
+            a   = 8'h0A,       a_ = 8'hFF,
+            f   = 8'b11000100, f_ = 8'h00;
                  //  SZ A P C
 
 // Сохраненный опкод
@@ -72,19 +74,13 @@ reg  [ 7:0] _l = 8'h00;     // Что писать
 reg  [ 7:0] _u = 8'h00;     // Что писать
 reg  [ 7:0] _f = 8'h00;     // Сохранение флага
 reg         fw;             // Писать флаги
-reg  [ 1:0] spec;           // Специальные операции; EX DE,HL; EX AF,AF'
+reg  [ 2:0] spec;           // Специальные операции; EX DE,HL; EX AF,AF'
 
 // Определение условий
-wire [15:0] signext = pc + 1 + {{8{in[7]}}, in[7:0]};
-wire [7:0]  ccc     = {~f[SF], f[SF], ~f[PF], f[PF], ~f[CF], f[CF], ~f[ZF], f[ZF]};
-
-wire        ccx     = (opcode[5:4] == 2'b00) & (f[ZF] == opcode[3]) | // NZ, Z,
-                      (opcode[5:4] == 2'b01) & (f[CF] == opcode[3]) | // NC, C,
-                      (opcode[5:4] == 2'b10) & (f[PF] == opcode[3]) | // PO, PE
-                      (opcode[5:4] == 2'b11) & (f[SF] == opcode[3]) | // P, M
-                       opcode == 8'b11_001_001 | // RET
-                       opcode == 8'b11_000_011 | // JP
-                       opcode == 8'b11_001_101;  // CALL
+wire [15:0] pci = pc + 1;
+wire [15:0] pcn = pci + {{8{in[7]}}, in[7:0]};
+wire [7:0]  ccc = {f[SF], ~f[SF], f[PF], ~f[PF], f[CF], ~f[CF], f[ZF], ~f[ZF]};
+wire        ccx = ccc[op53] || opcode == 8'hC9 || opcode == 8'hC3 || opcode == 8'hCD; // CCC; RET, JP, CALL
 
 // -----------------------------------------------------------------------------
 // Работа с регистрами
@@ -121,6 +117,7 @@ wire [16:0] hladd = hl + r16;
 // Инструкции INC и DEC
 wire [8:0] incdec = opcode[0] ? r53 - 1 : r53 + 1;  // Расчет результата
 wire       r53ido = r53 == (127 + opcode[0]);       // Флаг overflow
+wire [7:0] idflag = {incdec[7], incdec[7:0] == 8'b0, 1'b0, incdec[4] ^ r53[4], 1'b0, r53ido, 1'b0, incdec[8]};
 
 // -----------------------------------------------------------------------------
 // Исполнение инструкции
@@ -163,7 +160,6 @@ else if (locked) begin
         // Запись опкода на первом такте
         if (t == 0) begin
 
-            t     <= 1;           // По умолчанию, к следующему такту
             irq   <= 0;           // Сброс IRQ вектора
             latch <= in;          // Запомнить опкод
             ei    <= ei_;         // Сброс EI-триггера
@@ -177,6 +173,9 @@ else if (locked) begin
         // 1 NOP
         8'b00_000_000: t <= 0;
 
+        // 1 EX AF,AF'
+        8'b00_001_000: begin t <= 0; spec <= EX_AF; end
+
         // 1+ DJNZ *
         8'b00_010_000: case (t)
 
@@ -189,18 +188,18 @@ else if (locked) begin
                 if (bc[15:8] == 1) pc <= pc + 2;
 
             end
-            1: begin t <= 0; pc <= signext; end
+            1: begin t <= 0; pc <= pcn; end
 
         endcase
 
         // 2 JR *
-        8'b00_011_000: if (t == 1) begin t <= 0; pc <= signext; end
+        8'b00_011_000: if (t == 1) begin t <= 0; pc <= pcn; end
 
         // 1+ JR cc, *
         8'b00_1xx_000: case (t)
 
-            0: if (ccc[opcode[4:3]]) begin t <= 0; pc <= pc + 2; end
-            1: begin t <= 0; pc <= signext; end
+            0: if (!ccc[opcode[4:3]]) begin t <= 0; pc <= pc + 2; end
+            1: begin t <= 0; pc <= pcn; end
 
         endcase
 
@@ -208,8 +207,8 @@ else if (locked) begin
         8'b00_xx0_001: case (t)
 
             0: begin _n <= opcode[5:4]; end
-            1: begin pc <= pc + 1; t <= 2; _l <= in; end
-            2: begin pc <= pc + 1; t <= 0; _u <= in; _w <= 1'b1; end
+            1: begin pc <= pc + 1; _l <= in; end
+            2: begin pc <= pc + 1; _u <= in; _w <= 1; t <= 0; end
 
         endcase
 
@@ -217,8 +216,8 @@ else if (locked) begin
         8'b00_xx1_001: begin
 
             t  <= 0;
-            _w <= 1; // 16-бит
-            _n <= 2; // HL
+            _w <= 1;
+            _n <= REG_HL;
 
             {_u, _l} <= hladd;
 
@@ -248,28 +247,28 @@ else if (locked) begin
         // 5 LD (**), HL
         8'b00_100_010: case (t)
 
-            1: begin t <= 2; cp[7:0]  <= in; pc <= pc + 1; end
-            2: begin t <= 3; cp[15:8] <= in; we <= 1; alt <= 1; out <= hl[ 7:0]; end
-            3: begin t <= 4; cp <= cp + 1;   we <= 1; alt <= 1; out <= hl[15:8]; end
-            4: begin t <= 0; pc <= pc + 1; end
+            1: begin cp[ 7:0] <= in; pc <= pc + 1; end
+            2: begin cp[15:8] <= in; we <= 1; alt <= 1; out <= hl[ 7:0]; pc <= pc + 1;  end
+            3: begin cp <= cp + 1;   we <= 1; alt <= 1; out <= hl[15:8]; end
+            4: begin t <= 0; end
 
         endcase
 
         // 5 LD HL, (**)
         8'b00_101_010: case (t)
 
-            1: begin t <= 2; pc <= pc + 1; cp[ 7:0] <= in;    end
-            2: begin t <= 3; pc <= pc + 1; cp[15:8] <= in;    alt <= 1; end
-            3: begin t <= 4; _n <= REG_L; _b <= 1; _l <= in; alt <= 1; cp <= cp + 1; end
-            4: begin t <= 0; _n <= REG_H; _b <= 1; _l <= in; end
+            1: begin pc <= pc + 1; cp[ 7:0] <= in;   end
+            2: begin pc <= pc + 1; cp[15:8] <= in;   alt <= 1; end
+            3: begin _n <= REG_L; _b <= 1; _l <= in; alt <= 1; cp <= cp + 1; end
+            4: begin _n <= REG_H; _b <= 1; _l <= in; t <= 0; end
 
         endcase
 
         // 4 LD (**), A
         8'b00_110_010: case (t)
 
-            1: begin t <= 2; cp[ 7:0] <= in; pc <= pc + 1; end
-            2: begin t <= 3; cp[15:8] <= in; pc <= pc + 1; we <= 1; alt <= 1; out <= a[7:0]; end
+            1: begin cp[ 7:0] <= in; pc <= pc + 1; out <= a; end
+            2: begin cp[15:8] <= in; pc <= pc + 1; we <= 1; alt <= 1; end
             3: begin t <= 0; end
 
         endcase
@@ -277,9 +276,9 @@ else if (locked) begin
         // 4 LD A, (**)
         8'b00_111_010: case (t)
 
-            1: begin t <= 2; pc <= pc + 1; cp[ 7:0] <= in; end
-            2: begin t <= 3; pc <= pc + 1; cp[15:8] <= in; alt <= 1; end
-            3: begin t <= 0; _b <= 1; _n <= REG_A; _l <= in; end
+            1: begin pc <= pc + 1; cp[ 7:0] <= in; end
+            2: begin pc <= pc + 1; cp[15:8] <= in; alt <= 1; end
+            3: begin _b <= 1; _n <= REG_A; _l <= in; t <= 0; end
 
         endcase
 
@@ -301,8 +300,8 @@ else if (locked) begin
             0: begin cp <= hl; alt <= 1; end
             1: begin
 
+                _f  <= idflag;
                 out <= incdec;
-                _f  <= {incdec[7], incdec[7:0] == 8'b0, 1'b0, incdec[4] ^ r53[4], 1'b0, r53ido, 1'b0, incdec[8]};
                 fw  <= 1;
                 we  <= 1;
                 alt <= 1;
@@ -319,7 +318,7 @@ else if (locked) begin
             _n  <= op53;
             _b  <= 1;
             _l  <= incdec;
-            _f  <= {incdec[7], incdec[7:0] == 8'b0, 1'b0, incdec[4] ^ r53[4], 1'b0, r53ido, 1'b0, incdec[8]};
+            _f  <= idflag;
             fw  <= 1;
 
         end
@@ -396,7 +395,7 @@ else if (locked) begin
 
                 t   <= 0;
                 fw  <= 1;
-                _b  <= (op53 != ALU_CP);  // Запись в регистр A, кроме CP инструкции
+                _b  <= (op53 != ALU_CP);
                 _l  <= alu_r;
                 _f  <= alu_f;
                 _n  <= REG_A;
@@ -423,49 +422,44 @@ else if (locked) begin
         8'b11_001_001,
         8'b11_xxx_000: case (t)
 
-            0: begin t <= ccc; alt <= ccc; cp <= sp; end
-            1: begin t <= 2; pc[ 7:0] <= in; alt   <= 1; cp <= cp + 1; end
-            2: begin t <= 0; pc[15:8] <= in; _w <= 1; {_u, _l} <= cp + 1; _n <= REG_SP; end
+            0: begin t <= ccx; alt <= ccx; cp <= sp; end
+            1: begin pc[ 7:0] <= in; alt <= 1; cp <= cp + 1; end
+            2: begin pc[15:8] <= in; spec <= INCSP2; t <= 0; end
 
         endcase
 
-        // 4 POP r16
+        // 3 POP r16
         8'b11_xx0_001: case (t)
 
-            0: begin cp <= sp; alt <= 1; end
-            1: begin t <= 2; cp <= cp + 1; _l <= in; alt <= 1;  end
-            2: begin t <= 3; cp <= cp + 1; _u <= in;
+            0: begin cp <= sp; alt <= 1; spec <= INCSP2; end
+            1: begin _l <= in; alt <= 1; cp <= cp + 1; end
+            2: begin
 
-                 if (opcode[5:4] == 2'b11) // POP AF
-                      begin _n <= REG_A; _b <= 1; _l <= in; fw <= 1'b1; _f <= _l; end
-                 else begin _n <= opcode[5:4];    _w <= 1; end
+                _u <= in;
+                t  <= 0;
+
+                if (opcode[5:4] == 2'b11)
+                     begin _n <= REG_A; _b <= 1; _l <= in; fw <= 1'b1; _f <= _l; end // POP AF
+                else begin _n <= opcode[5:4];    _w <= 1; end
 
             end
-            3: begin t <= 0; _n <= REG_SP; _w <= 1; {_u, _l} <= cp; end
 
         endcase
 
+        // 1 EXX
         // 1 JP (HL)
-        8'b11_101_001: case (t)
-
-            0: begin pc <= hl; t <= 0; end
-
-        endcase
-
         // 1 LD SP, HL
-        8'b11_111_001: case (t)
+        8'b11_011_001: begin t <= 0; spec <= EXX; end
+        8'b11_101_001: begin t <= 0; pc <= hl; end
+        8'b11_111_001: begin t <= 0; _w <= 1; _n <= REG_SP; {_u, _l} <= hl; end
 
-            0: begin t <= 0; _n <= REG_SP; _w <= 1; {_u, _l} <= hl; end
-
-        endcase
-
-        // 4 JP c, ** | JP **
+        // 1/3 JP c, ** | JP **
         8'b11_000_011,
         8'b11_xxx_010: case (t)
 
-            1: begin t <= 2; pc <= pc + 1'b1; _l <= in; end
-            2: begin t <= 3; pc <= pc + 1'b1; _u <= in; end
-            3: begin t <= 0; if (ccc) pc <= {_u, _l}; end
+            0: if (!ccx) begin t <= 0; pc <= pc + 3; end
+            1: begin _l <= in; pc <= pc + 1'b1; end
+            2: begin pc <= {in, _l}; t <= 0; end
 
         endcase
 
@@ -488,28 +482,44 @@ else if (locked) begin
         8'b11_100_011: case (t)
 
             0: begin alt <= 1; cp <= sp; end
-            1: begin alt <= 1; t <= 2; _l <= in; out <= hl[7:0]; we <= 1; end
-            2: begin alt <= 1; t <= 3; cp <= cp + 1; end
-            3: begin alt <= 1; t <= 4; _u <= in; _w <= 1; _n <= REG_HL; out <= hl[15:8]; we <= 1; end
+            1: begin alt <= 1; _l <= in; out <= hl[ 7:0]; we <= 1; end
+            2: begin alt <= 1; cp <= cp + 1; end
+            3: begin alt <= 1; _u <= in; out <= hl[15:8]; we <= 1; _w <= 1; _n <= REG_HL; end
             4: begin t <= 0; end
 
         endcase
 
         // 1 EX DE, HL
-        8'b11_101_011: begin t <= 0; spec <= EX_DE_HL; end
         // 1 DI, EI
+        8'b11_101_011: begin t <= 0; spec <= EX_DE_HL; end
         8'b11_11x_011: begin t <= 0; ei_ <= opcode[3]; end
 
-        // 3/6 CALL c, **
+        // 1/5 CALL c, **
         8'b11_001_101,
         8'b11_xxx_100: case (t)
 
-            1: begin t <= 2; pc <= pc + 1; _l <= in; end
-            2: begin         pc <= pc + 1; _u <= in; cp <= sp;
-                     t <= ccc ? 3 : 0; end
-            3: begin t <= 4; out <= pc[15:8]; we <= 1; alt <= 1; cp <= cp - 1; end
-            4: begin t <= 5; out <= pc[ 7:0]; we <= 1; alt <= 1; cp <= cp - 1; end
-            5: begin t <= 0; _w <= 1; _n <= REG_SP; pc <= {_u, _l}; {_u, _l} <= cp; end
+            0: if (!ccx) begin t <= 0; pc <= pc + 3; end
+            1: begin _l <= in; pc <= pc + 1; end
+            2: begin
+
+                alt  <= 1;
+                we   <= 1;
+                cp   <= sp - 1;
+                out  <= pci[15:8];
+                _u   <= in;
+
+            end
+            3: begin
+
+                alt  <= 1;
+                we   <= 1;
+                out  <= pci[ 7:0];
+                cp   <= cp - 1;
+                pc   <= {_u, _l};
+                spec <= DECSP2;
+
+            end
+            4: t <= 0;
 
         endcase
 
@@ -648,8 +658,11 @@ begin
 
     // Сохранение регистров
     case (spec)
-    EX_AF:    begin {a,  a_} <= {a_,  a}; end // EX AF,AF'
-    EX_DE_HL: begin {de, hl} <= {hl, de}; end // EX DE,HL
+    INCSP2:   sp <= sp + 2;
+    DECSP2:   sp <= sp - 2;
+    EXX:      begin {bc, de, hl, bc_, de_, hl_} <= {bc_, de_, hl_, bc, de, hl}; end // EXX
+    EX_AF:    begin {a, f, a_, f_} <= {a_, f_, a, f}; end   // EX AF,AF'
+    EX_DE_HL: begin {de, hl} <= {hl, de}; end               // EX DE,HL
     default:
 
         // Запись в 16-битные регистры
