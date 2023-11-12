@@ -1,0 +1,76 @@
+[*]
+[*] GTKWave Analyzer v3.3.66 (w)1999-2015 BSI
+[*] Sun Nov 12 04:23:16 2023
+[*]
+[dumpfile] "tb.vcd"
+[dumpfile_mtime] "Sun Nov 12 04:22:33 2023"
+[dumpfile_size] 97501
+[savefile] "tb.gtkw"
+[timestart] 0
+[size] 1280 608
+[pos] -1 -1
+*-6.000000 101 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] tb.
+[sst_width] 197
+[signals_width] 177
+[sst_expanded] 1
+[sst_vpaned_height] 156
+@28
+[color] 2
+tb.clk
+[color] 2
+tb.clock
+@22
+[color] 2
+tb.cpu.t[3:0]
+@800200
+-IFACE
+@28
+tb.cpu.alt
+@22
+tb.address[15:0]
+tb.in[7:0]
+tb.out[7:0]
+@28
+tb.we
+@1000200
+-IFACE
+@800200
+-REGS
+@22
+[color] 5
+tb.cpu.bc[15:0]
+[color] 5
+tb.cpu.de[15:0]
+[color] 5
+tb.cpu.hl[15:0]
+[color] 5
+tb.cpu.sp[15:0]
+[color] 5
+tb.cpu.a[7:0]
+@c00023
+[color] 5
+tb.cpu.f[7:0]
+@28
+[color] 5
+(0)tb.cpu.f[7:0]
+[color] 5
+(1)tb.cpu.f[7:0]
+[color] 5
+(2)tb.cpu.f[7:0]
+[color] 5
+(3)tb.cpu.f[7:0]
+[color] 5
+(4)tb.cpu.f[7:0]
+[color] 5
+(5)tb.cpu.f[7:0]
+[color] 5
+(6)tb.cpu.f[7:0]
+[color] 5
+(7)tb.cpu.f[7:0]
+@1401201
+-group_end
+@1000200
+-REGS
+[pattern_trace] 1
+[pattern_trace] 0

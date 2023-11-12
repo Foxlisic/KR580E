@@ -10,43 +10,21 @@ module kr580(
     output  reg          pw,        // Port Write
     output  reg  [ 7:0]  out,
 
-
     // Interrupt
     input   wire         intr
-
 );
 
-localparam
+localparam // Набор АЛУ
+    ALU_ADD = 0, ALU_ADC = 1, ALU_SUB = 2, ALU_SBC = 3,
+    ALU_AND = 4, ALU_XOR = 5, ALU_OR  = 6, ALU_CP  = 7;
 
-    // Базовый набор
-    ALU_ADD = 0,    ALU_ADC = 1,    ALU_SUB = 2,    ALU_SBC = 3,
-    ALU_AND = 4,    ALU_XOR = 5,    ALU_OR  = 6,    ALU_CP  = 7;
+localparam // Флаги и регистры
+    REG_B  = 0, REG_C  = 1, REG_D = 2, REG_E = 3,
+    REG_H  = 4, REG_L  = 5,            REG_A = 7,
+    REG_HL = 2, REG_SP = 3, CF    = 0, NF    = 1,
+    PF     = 2, AF     = 4, ZF    = 6, SF    = 7;
 
-`define CF 0
-`define NF 1
-`define PF 2
-`define AF 4
-`define ZF 6
-`define SF 7
-
-`define REG_B       0
-`define REG_C       1
-`define REG_D       2
-`define REG_E       3
-`define REG_H       4
-`define REG_L       5
-`define REG_F       6
-`define REG_A       7
-
-`define REG_HL      2
-`define REG_SP      3
-
-initial begin
-
-    we  = 0;
-    out = 0;
-
-end
+initial begin we  = 0; out = 0; end
 
 // Указатель на необходимые данные
 assign address = alt ? cp : pc;
@@ -54,14 +32,13 @@ assign address = alt ? cp : pc;
 // Управляющие регистры
 reg  [ 3:0] t       = 0;        // Это t-state
 reg  [ 2:0] m       = 0;        // Это m-state для префиксов
-reg         halt    = 0;        // Процессор остановлен
 reg         ei      = 0;        // Enabled Interrupt
 reg         ei_     = 0;        // Это необходимо для EI+RET конструкции
 reg  [15:0] cp      = 0;
 reg         alt     = 1'b0;     // =0 pc  =1 cp
 
 // Регистры общего назначения
-reg  [15:0] bc  = 16'hAFB1, de = 16'h0305, hl = 16'h4012;
+reg  [15:0] bc  = 16'hAFB1, de = 16'h0305, hl = 16'h0003;
 reg  [15:0] pc  = 16'h0000, sp = 16'h0000;
 reg  [ 1:0] im  = 2'b00;
 reg  [ 7:0] i   = 8'h00,
@@ -74,7 +51,7 @@ wire [ 7:0] opcode          = t ? latch : in;
 reg  [ 7:0] latch           = 8'h00;
 reg         prev_intr       = 1'b0;
 reg         irq             = 1'b0;     // Исполнение запроса IRQ
-reg  [ 2:0] irq_t           = 1'b0;     // Шаг исполнения
+reg  [ 2:0] irq_t           = 1'b0;     // Шаг исполнения IRQ
 
 // Управление записью в регистры
 reg         _b = 1'b0;      // Сигнал на запись 8 битного регистра
@@ -89,11 +66,11 @@ reg         ex_de_hl;
 // Определение условий
 wire        reg_hl  = (_n == 3'b110);
 wire [15:0] signext = pc + 1 + {{8{in[7]}}, in[7:0]};
-wire [3:0]  cc      = {f[`CF], ~f[`CF], f[`ZF], ~f[`ZF]};
-wire        ccc     = (opcode[5:4] == 2'b00) & (f[`ZF] == opcode[3]) | // NZ, Z,
-                      (opcode[5:4] == 2'b01) & (f[`CF] == opcode[3]) | // NC, C,
-                      (opcode[5:4] == 2'b10) & (f[`PF] == opcode[3]) | // PO, PE
-                      (opcode[5:4] == 2'b11) & (f[`SF] == opcode[3]) | // P, M
+wire [3:0]  cc      = {f[CF], ~f[CF], f[ZF], ~f[ZF]};
+wire        ccc     = (opcode[5:4] == 2'b00) & (f[ZF] == opcode[3]) | // NZ, Z,
+                      (opcode[5:4] == 2'b01) & (f[CF] == opcode[3]) | // NC, C,
+                      (opcode[5:4] == 2'b10) & (f[PF] == opcode[3]) | // PO, PE
+                      (opcode[5:4] == 2'b11) & (f[SF] == opcode[3]) | // P, M
                        opcode == 8'b11_001_001 | // RET
                        opcode == 8'b11_000_011 | // JP
                        opcode == 8'b11_001_101;  // CALL
@@ -108,7 +85,7 @@ wire [2:0] op53 = opcode[5:3];
 wire [1:0] op54 = opcode[5:4];
 
 // Вариант 1. Источник opcode[2:0]
-wire [7:0] _r20 =
+wire [7:0] r20 =
     op20 == 3'h0 ? bc[15:8] : // B
     op20 == 3'h1 ? bc[ 7:0] : // C
     op20 == 3'h2 ? de[15:8] : // D
@@ -118,33 +95,27 @@ wire [7:0] _r20 =
     op20 == 3'h6 ? in : a;    // F, A
 
 // Вариант 2. Источник opcode[5:3]
-wire [7:0] _r53 =
+wire [7:0] r53 =
     op53 == 3'h0 ? bc[15:8] : // B
     op53 == 3'h1 ? bc[ 7:0] : // C
     op53 == 3'h2 ? de[15:8] : // D
     op53 == 3'h3 ? de[ 7:0] : // E
     op53 == 3'h4 ? hl[15:8] : // H
     op53 == 3'h5 ? hl[ 7:0] : // L
-    op53 == 3'h6 ? in : a;    // F, A
+    op53 == 3'h6 ? in : a;    // (HL), A
 
 // 16-битный регистр, источник opcode[5:4]
-wire [15:0] _r16 =
+wire [15:0] r16 =
     op54 == 3'h0 ? bc :
     op54 == 3'h1 ? de :
     op54 == 3'h2 ? hl : sp;
 
-// Случай 1: Регистр или HL
-// Случай 2: Значение из Immediate
-wire [7:0]  op2 = (opcode[7:6] == 2'b11) ? in : _r20;
-
 // 16-битные операции HL + R16
-wire [16:0] hladd = hl + _r16;
+wire [16:0] hladd = hl + r16;
 
 // Инструкции INC и DEC
-wire [8:0] _r53i   = _r53 + 1;
-wire [8:0] _r53d   = _r53 - 1;
-wire       _r53ido = _r53 == (127 + opcode[0]);
-wire [8:0] _r53id  = opcode[0] ? _r53d : _r53i;
+wire [8:0] r53id  = opcode[0] ? r53 - 1 : r53 + 1;  // Расчет результата
+wire       r53ido = r53 == (127 + opcode[0]);       // Флаг overflow
 
 // -----------------------------------------------------------------------------
 // Исполнение инструкции
@@ -162,7 +133,6 @@ else if (locked) begin
     _w       <= 1'b0;
     we       <= 1'b0;
     pw       <= 1'b0;
-    halt     <= 1'b0;
     fw       <= 1'b0;
     ex_de_hl <= 1'b0;
 
@@ -208,7 +178,7 @@ else if (locked) begin
             0: begin
 
                 _b <= 1;
-                _n <= `REG_B;
+                _n <= REG_B;
                 _l <= bc[15:8] - 1;
 
                 if (bc[15:8] == 1) pc <= pc + 2;
@@ -247,10 +217,10 @@ else if (locked) begin
 
             {_u, _l} <= hladd;
 
-            _f[`NF]  <= 1'b0;
-            _f[`CF]  <= hladd[16];
-            _f[`ZF]  <= hladd[15:0] == 0;
-            _f[`SF]  <= hladd[15];
+            _f[NF]  <= 1'b0;
+            _f[CF]  <= hladd[16];
+            _f[ZF]  <= hladd[15:0] == 0;
+            _f[SF]  <= hladd[15];
 
         end
 
@@ -266,7 +236,7 @@ else if (locked) begin
         8'b00_0x1_010: case (t)
 
             0: begin alt <= 1; cp <= opcode[4] ? de : bc;  end
-            1: begin t   <= 0; _n <= `REG_A; _b <= 1; _l <= in; end
+            1: begin t   <= 0; _n <= REG_A; _b <= 1; _l <= in; end
 
         endcase
 
@@ -285,8 +255,8 @@ else if (locked) begin
 
             1: begin t <= 2; pc <= pc + 1; cp[ 7:0] <= in;    end
             2: begin t <= 3; pc <= pc + 1; cp[15:8] <= in;    alt <= 1; end
-            3: begin t <= 4; _n <= `REG_L; _b <= 1; _l <= in; alt <= 1; cp <= cp + 1; end
-            4: begin t <= 0; _n <= `REG_H; _b <= 1; _l <= in; end
+            3: begin t <= 4; _n <= REG_L; _b <= 1; _l <= in; alt <= 1; cp <= cp + 1; end
+            4: begin t <= 0; _n <= REG_H; _b <= 1; _l <= in; end
 
         endcase
 
@@ -304,7 +274,7 @@ else if (locked) begin
 
             1: begin t <= 2; pc <= pc + 1; cp[ 7:0] <= in; end
             2: begin t <= 3; pc <= pc + 1; cp[15:8] <= in; alt <= 1; end
-            3: begin t <= 0; _b <= 1; _n <= `REG_A; _l <= in; end
+            3: begin t <= 0; _b <= 1; _n <= REG_A; _l <= in; end
 
         endcase
 
@@ -326,8 +296,8 @@ else if (locked) begin
             0: begin cp <= hl; alt <= 1; end
             1: begin
 
-                out <= _r53id[7:0];
-                _f  <= {_r53id[7], _r53id[7:0] == 8'b0, 1'b0, _r53id[4] ^ _r53[4], 1'b0, _r53ido, 1'b0, _r53id[8]};
+                out <= r53id[7:0];
+                _f  <= {r53id[7], r53id[7:0] == 8'b0, 1'b0, r53id[4] ^ r53[4], 1'b0, r53ido, 1'b0, r53id[8]};
                 fw  <= 1;
                 we  <= 1;
                 alt <= 1;
@@ -343,8 +313,8 @@ else if (locked) begin
             t   <= 0;
             _n  <= op53;
             _b  <= 1;
-            _l  <= _r53id[7:0];
-            _f  <= {_r53id[7], _r53id[7:0] == 8'b0, 1'b0, _r53id[4] ^ _r53[4], 1'b0, _r53ido, 1'b0, _r53id[8]};
+            _l  <= r53id[7:0];
+            _f  <= {r53id[7], r53id[7:0] == 8'b0, 1'b0, r53id[4] ^ r53[4], 1'b0, r53ido, 1'b0, r53id[8]};
             fw  <= 1;
 
         end
@@ -363,7 +333,7 @@ else if (locked) begin
 
             t  <= 0;
             fw <= 1;
-            _n <= `REG_A;
+            _n <= REG_A;
             _b <= 1;
             _l <= alu_sr;
             _f <= alu_sf;
@@ -386,7 +356,7 @@ else if (locked) begin
         // 2 LD (HL), r
         8'b01_110_xxx: case (t)
 
-            0: begin alt <= 1; cp <= hl; we <= 1; out <= _r20; end
+            0: begin alt <= 1; cp <= hl; we <= 1; out <= r20; end
             1: begin t <= 0; end
 
         endcase
@@ -397,7 +367,7 @@ else if (locked) begin
             t  <= 0;
             _b <= 1;
             _n <= op53;
-            _l <= _r20;
+            _l <= r20;
 
         end
 
@@ -412,7 +382,7 @@ else if (locked) begin
                 _b  <= (op53 != ALU_CP);  // Запись в регистр A, кроме CP инструкции
                 _l  <= alu_r;
                 _f  <= alu_f;
-                _n  <= `REG_A;
+                _n  <= REG_A;
 
             end
 
@@ -426,19 +396,19 @@ else if (locked) begin
             _b  <= (op53 != ALU_CP);
             _l  <= alu_r;
             _f  <= alu_f;
-            _n  <= `REG_A;
+            _n  <= REG_A;
 
         end
 
         // --------------------------
 
-        // 2/3 RET c | RET
+        // 1/3 RET c | RET
         8'b11_001_001,
         8'b11_xxx_000: case (t)
 
             0: begin t <= ccc; alt <= ccc; cp <= sp; end
             1: begin t <= 2; pc[ 7:0] <= in; alt   <= 1; cp <= cp + 1; end
-            2: begin t <= 0; pc[15:8] <= in; _w <= 1; {_u, _l} <= cp + 1; _n <= `REG_SP; end
+            2: begin t <= 0; pc[15:8] <= in; _w <= 1; {_u, _l} <= cp + 1; _n <= REG_SP; end
 
         endcase
 
@@ -450,11 +420,11 @@ else if (locked) begin
             2: begin t <= 3; cp <= cp + 1; _u <= in;
 
                  if (opcode[5:4] == 2'b11) // POP AF
-                      begin _n <= `REG_A;      _b <= 1; _l <= in; fw <= 1'b1; _f <= _l; end
-                 else begin _n <= opcode[5:4]; _w <= 1; end
+                      begin _n <= REG_A; _b <= 1; _l <= in; fw <= 1'b1; _f <= _l; end
+                 else begin _n <= opcode[5:4];    _w <= 1; end
 
             end
-            3: begin t <= 0; _n <= `REG_SP; _w <= 1; {_u, _l} <= cp; end
+            3: begin t <= 0; _n <= REG_SP; _w <= 1; {_u, _l} <= cp; end
 
         endcase
 
@@ -468,7 +438,7 @@ else if (locked) begin
         // 1 LD SP, HL
         8'b11_111_001: case (t)
 
-            0: begin t <= 0; _n <= `REG_SP; _w <= 1; {_u, _l} <= hl; end
+            0: begin t <= 0; _n <= REG_SP; _w <= 1; {_u, _l} <= hl; end
 
         endcase
 
@@ -493,7 +463,7 @@ else if (locked) begin
         8'b11_011_011: case (t)
 
             1: begin t <= 2; pc <= pc + 1; cp <= in; alt <= 1; end
-            2: begin t <= 0; _l <= in; _b <= 1; _n <= `REG_A; end
+            2: begin t <= 0; _l <= in; _b <= 1; _n <= REG_A; end
 
         endcase
 
@@ -503,7 +473,7 @@ else if (locked) begin
             0: begin alt <= 1; cp <= sp; end
             1: begin alt <= 1; t <= 2; _l <= in; out <= hl[7:0]; we <= 1; end
             2: begin alt <= 1; t <= 3; cp <= cp + 1; end
-            3: begin alt <= 1; t <= 4; _u <= in; _w <= 1; _n <= `REG_HL; out <= hl[15:8]; we <= 1; end
+            3: begin alt <= 1; t <= 4; _u <= in; _w <= 1; _n <= REG_HL; out <= hl[15:8]; we <= 1; end
             4: begin t <= 0; end
 
         endcase
@@ -527,7 +497,7 @@ else if (locked) begin
                      t <= ccc ? 3 : 0; end
             3: begin t <= 4; out <= pc[15:8]; we <= 1; alt <= 1; cp <= cp - 1; end
             4: begin t <= 5; out <= pc[ 7:0]; we <= 1; alt <= 1; cp <= cp - 1; end
-            5: begin t <= 0; _w <= 1; _n <= `REG_SP; pc <= {_u, _l}; {_u, _l} <= cp; end
+            5: begin t <= 0; _w <= 1; _n <= REG_SP; pc <= {_u, _l}; {_u, _l} <= cp; end
 
         endcase
 
@@ -539,9 +509,9 @@ else if (locked) begin
                 alt <= 1;
                 we  <= 1;
                 cp  <= sp - 1;
-                out <= (op54 == 2'b11) ? a : _r16[15:8];
+                out <= (op54 == 2'b11) ? a : r16[15:8];
                 _w  <= 1;
-                _n  <= `REG_SP;
+                _n  <= REG_SP;
                 {_u, _l} <= sp - 2;
 
             end
@@ -552,7 +522,7 @@ else if (locked) begin
                 alt <= 1;
                 we  <= 1;
                 cp  <= cp - 1;
-                out <= (op54 == 2'b11) ? f : _r16[ 7:0];
+                out <= (op54 == 2'b11) ? f : r16[ 7:0];
 
             end
 
@@ -560,12 +530,21 @@ else if (locked) begin
 
         endcase
 
-        // 3 <ALU> A, i8
+        // 2 <ALU> A, i8
         8'b11_xxx_110: case (t)
 
-            0: begin  end
-            1: begin t <= 2; pc <= pc + 1; end
-            2: begin t <= 0; fw <= 1'b1; _f <= alu_f; _n <= `REG_A; _b <= (op53 != 3'b111); _l <= alu_r; end
+            // Так как op20 равно 6, то в _r20 = in
+            1: begin
+
+                t   <= 0;
+                pc  <= pc + 1;
+                fw  <= 1;
+                _b  <= (op53 != ALU_CP);
+                _l  <= alu_r;
+                _f  <= alu_f;
+                _n  <= REG_A;
+
+            end
 
         endcase
 
@@ -575,7 +554,7 @@ else if (locked) begin
             0: begin cp <= sp; end
             1: begin t <= 2; out <= pc[15:8]; we <= 1; cp <= cp - 1; alt <= 1; end
             2: begin t <= 3; out <= pc[ 7:0]; we <= 1; cp <= cp - 1; alt <= 1; end
-            3: begin t <= 0; _w <= 1; _n <= `REG_SP; {_u, _l} <= cp; pc <= {op53, 3'b000}; end
+            3: begin t <= 0; _w <= 1; _n <= REG_SP; {_u, _l} <= cp; pc <= {op53, 3'b000}; end
 
         endcase
 
@@ -589,29 +568,29 @@ end
 // Арифметико-логическое устройство
 // -----------------------------------------------------------------------------
 
-wire flag_carry =   alu_r[8];
-wire flag_sign  =   alu_r[7];
-wire flag_zero  = ~|alu_r[7:0];
-wire flag_prty  = ~^alu_r[7:0];
-wire flag_aux   =  a[4] ^ op2[4] ^ alu_r[4];
-wire flag_add   = (a[7] == op2[7]) && (a[7] != alu_r[7]);
-wire flag_sub   = (a[7] != op2[7]) && (a[7] != alu_r[7]);
+wire carry  =   alu_r[8];
+wire sign   =   alu_r[7];
+wire zero   = ~|alu_r[7:0];
+wire prty   = ~^alu_r[7:0];
+wire aux    =  a[4] ^ r20[4] ^ alu_r[4];
+wire fadd   = (a[7] == r20[7]) && (a[7] != alu_r[7]);
+wire fsub   = (a[7] != r20[7]) && (a[7] != alu_r[7]);
+wire is_add = op53 == ALU_ADD || op53 == ALU_ADC;
+wire is_lgc = op53 == ALU_AND || op53 == ALU_OR || op53 == ALU_XOR;
 
 // Определение результата
 wire [16:0] alu_r =
-    op53 == ALU_ADD ? a + op2 :
-    op53 == ALU_ADC ? a + op2 + f[`CF] :
-    op53 == ALU_SBC ? a - op2 - f[`CF] :
-    op53 == ALU_AND ? a & op2 :
-    op53 == ALU_XOR ? a ^ op2 :
-    op53 == ALU_OR  ? a | op2 :
-                       a - op2;   // SUB, CP
+    op53 == ALU_ADD ? a + r20 :
+    op53 == ALU_ADC ? a + r20 + f[CF] :
+    op53 == ALU_SBC ? a - r20 - f[CF] :
+    op53 == ALU_AND ? a & r20 :
+    op53 == ALU_XOR ? a ^ r20 :
+    op53 == ALU_OR  ? a | r20 : a - r20; // OR; SUB, CP
 
 // Вычисление флагов
-wire [7:0] alu_f =
-    op53 == ALU_ADD || op53 == ALU_ADC ? {flag_sign, flag_zero, 1'b0, flag_aux, 1'b0, flag_add, 1'b0, flag_carry} :
-    op53 == ALU_SUB || op53 == ALU_CP  ? {flag_sign, flag_zero, 1'b0, flag_aux, 1'b0, flag_sub, 1'b1, flag_carry} :
-    {flag_sign, flag_zero, 3'b000, flag_prty, 2'b00};
+wire [7:0]  alu_f =
+    is_lgc? {sign, zero, 3'b000, prty, 2'b00} : // AND, OR, XOR
+            {sign, zero, 1'b0,   aux, 1'b0, (is_add ? fadd : fsub), 1'b0, carry};
 
 // -----------------------------------------------------------------------------
 // Сдвиги и работа над регистром A
@@ -619,20 +598,20 @@ wire [7:0] alu_f =
 
 // Отдельно, вычисление DAA
 wire [7:0] alu_sr_daa =
-    (f[`NF]) ? a - ((f[`AF] | (a[3:0] > 4'h9)) ? 8'h06 : 0) - ((f[`CF] | (a[7:0] > 8'h99)) ? 8'h60 : 0) :
-               a + ((f[`AF] | (a[3:0] > 4'h9)) ? 8'h06 : 0) + ((f[`CF] | (a[7:0] > 8'h99)) ? 8'h60 : 0);
+    (f[NF]) ? a - ((f[AF] | (a[3:0] > 4'h9)) ? 8'h06 : 0) - ((f[CF] | (a[7:0] > 8'h99)) ? 8'h60 : 0) :
+              a + ((f[AF] | (a[3:0] > 4'h9)) ? 8'h06 : 0) + ((f[CF] | (a[7:0] > 8'h99)) ? 8'h60 : 0);
 
 // Промежуточное вычисление флагов результата
 wire        alu_sr_prty = ~^alu_sr[7:0];
 wire        alu_sr_zero = alu_sr[7:0] == 8'b0;
-wire [7:0]  alu_sf_daa  = {alu_sr[7], alu_sr_zero, alu_sr[5], a[4] ^ alu_sr[4], alu_sr[3], alu_sr_prty, f[`NF], f[`CF] | (a > 8'h99)};
+wire [7:0]  alu_sf_daa  = {alu_sr[7], alu_sr_zero, alu_sr[5], a[4] ^ alu_sr[4], alu_sr[3], alu_sr_prty, f[NF], f[CF] | (a > 8'h99)};
 
 // Вычисление сдвигов
 wire [7:0] alu_sr =
     op53 == 3'h0 ? {a[6:0], a[  7]} : // RLCA
     op53 == 3'h1 ? {a[0],   a[7:1]} : // RRCA
-    op53 == 3'h2 ? {a[6:0], f[`CF]} : // RLA
-    op53 == 3'h3 ? {f[`CF], a[7:1]} : // RRA
+    op53 == 3'h2 ? {a[6:0], f[ CF]} : // RLA
+    op53 == 3'h3 ? {f[CF],  a[7:1]} : // RRA
     op53 == 3'h4 ? alu_sr_daa :       // DAA
     op53 == 3'h5 ? ~a : a;            // CPL : (SCF, CCF)
 
@@ -641,9 +620,9 @@ wire [7:0] alu_sf =
     op53 == 3'h0 || op53 == 3'h2 ? {alu_sr[7], alu_sr_zero, 3'b000, alu_sr_prty, 1'b1, a[7]} : // RLCA, RLA
     op53 == 3'h1 || op53 == 3'h3 ? {alu_sr[7], alu_sr_zero, 3'b000, alu_sr_prty, 1'b1, a[0]} : // RRCA, RRA
     op53 == 3'h4 ? alu_sf_daa : // DAA
-    op53 == 3'h5 ? {f[`SF], f[`ZF], 3'b010, f[`PF], 1'b1, f[`CF]} :
-    op53 == 3'h6 ? {f[`SF], f[`ZF], 1'b0, f[`AF], 1'b0, f[`PF], 2'b11} :
-                   {f[`SF], f[`ZF], 1'b0, f[`AF], 1'b0, f[`PF], 1'b1, f[`CF] ^ 1'b1};
+    op53 == 3'h5 ? {f[SF], f[ZF], 3'b010, f[PF], 1'b1, f[CF]} :
+    op53 == 3'h6 ? {f[SF], f[ZF], 1'b0, f[AF], 1'b0, f[PF], 2'b11} :
+                   {f[SF], f[ZF], 1'b0, f[AF], 1'b0, f[PF], 1'b1, f[CF] ^ 1'b1};
 
 // -----------------------------------------------------------------------------
 // Запись в регистры
