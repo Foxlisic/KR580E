@@ -14,15 +14,25 @@ module kr580(
     input   wire         intr
 );
 
-localparam // Набор АЛУ
+// Набор АЛУ
+localparam
     ALU_ADD = 0, ALU_ADC = 1, ALU_SUB = 2, ALU_SBC = 3,
-    ALU_AND = 4, ALU_XOR = 5, ALU_OR  = 6, ALU_CP  = 7;
+    ALU_AND = 4, ALU_XOR = 5, ALU_OR  = 6, ALU_CP  = 7,
+    ALU_RLC = 0, ALU_RRC = 1, ALU_RL  = 2, ALU_RR  = 3,
+    ALU_DAA = 4, ALU_CPL = 5, ALU_SCF = 6, ALU_CCF = 7;
 
-localparam // Флаги и регистры
-    REG_B  = 0, REG_C  = 1, REG_D = 2, REG_E = 3,
-    REG_H  = 4, REG_L  = 5,            REG_A = 7,
-    REG_HL = 2, REG_SP = 3, CF    = 0, NF    = 1,
-    PF     = 2, AF     = 4, ZF    = 6, SF    = 7;
+// Регистры
+localparam
+    REG_B  = 0, REG_C  = 1, REG_D  = 2, REG_E = 3,
+    REG_H  = 4, REG_L  = 5,             REG_A = 7,
+    REG_BC = 0, REG_DE = 1, REG_HL = 2, REG_SP = 3;
+
+// Флаги
+localparam CF = 0, NF = 1, PF = 2, AF = 4, ZF = 6, SF = 7;
+
+// Специальные
+localparam
+    EX_DE_HL = 1, EX_AF = 2;
 
 initial begin we  = 0; out = 0; end
 
@@ -43,6 +53,7 @@ reg  [15:0] pc  = 16'h0000, sp = 16'h0000;
 reg  [ 1:0] im  = 2'b00;
 reg  [ 7:0] i   = 8'h00,
             a   = 8'h0A,
+            a_  = 8'h00, // AUX A
             f   = 8'b00000000;
                  //  SZ A P C
 
@@ -61,7 +72,7 @@ reg  [ 7:0] _l = 8'h00;     // Что писать
 reg  [ 7:0] _u = 8'h00;     // Что писать
 reg  [ 7:0] _f = 8'h00;     // Сохранение флага
 reg         fw;             // Писать флаги
-reg         ex_de_hl;
+reg  [ 1:0] spec;           // Специальные операции; EX DE,HL; EX AF,AF'
 
 // Определение условий
 wire        reg_hl  = (_n == 3'b110);
@@ -128,13 +139,13 @@ if (reset_n == 1'b0) begin t <= 0; pc <= 0; alt <= 0; end
 else if (locked) begin
 
     // Подготовка управляющих сигналов
-    alt      <= 1'b0;
-    _b       <= 1'b0;
-    _w       <= 1'b0;
-    we       <= 1'b0;
-    pw       <= 1'b0;
-    fw       <= 1'b0;
-    ex_de_hl <= 1'b0;
+    alt   <= 1'b0;
+    _b   <= 1'b0;
+    _w   <= 1'b0;
+    we   <= 1'b0;
+    pw   <= 1'b0;
+    fw   <= 1'b0;
+    spec <= 1'b0;
 
     // Выполнение запроса IRQ
     if (irq_t) begin
@@ -479,12 +490,7 @@ else if (locked) begin
         endcase
 
         // 1 EX DE, HL
-        8'b11_101_011: case (t)
-
-            0: begin t <= 0; ex_de_hl <= 1; end
-
-        endcase
-
+        8'b11_101_011: begin t <= 0; spec <= EX_DE_HL; end
         // 1 DI, EI
         8'b11_11x_011: begin t <= 0; ei_ <= opcode[3]; end
 
@@ -568,13 +574,6 @@ end
 // Арифметико-логическое устройство
 // -----------------------------------------------------------------------------
 
-wire carry  =   alu_r[8];
-wire sign   =   alu_r[7];
-wire zero   = ~|alu_r[7:0];
-wire prty   = ~^alu_r[7:0];
-wire aux    =  a[4] ^ r20[4] ^ alu_r[4];
-wire fadd   = (a[7] == r20[7]) && (a[7] != alu_r[7]);
-wire fsub   = (a[7] != r20[7]) && (a[7] != alu_r[7]);
 wire is_add = op53 == ALU_ADD || op53 == ALU_ADC;
 wire is_lgc = op53 == ALU_AND || op53 == ALU_OR || op53 == ALU_XOR;
 
@@ -588,41 +587,48 @@ wire [16:0] alu_r =
     op53 == ALU_OR  ? a | r20 : a - r20; // OR; SUB, CP
 
 // Вычисление флагов
+wire carry  =   alu_r[8];
+wire sign   =   alu_r[7];
+wire zero   = ~|alu_r[7:0];
+wire prty   = ~^alu_r[7:0];
+wire aux    =  a[4] ^ r20[4] ^ alu_r[4];
+wire over   = (a[7] ^ r20[7] ^ is_add) && (a[7] != alu_r[7]);
+
 wire [7:0]  alu_f =
-    is_lgc? {sign, zero, 3'b000, prty, 2'b00} : // AND, OR, XOR
-            {sign, zero, 1'b0,   aux, 1'b0, (is_add ? fadd : fsub), 1'b0, carry};
+//           SF    ZF    F5    AF    F3    PF/OF    NF    CF
+    is_lgc? {sign, zero, 1'b0, 1'b0, 1'b0, prty,    1'b0, 1'b0} : // AND, OR, XOR
+            {sign, zero, 1'b0, aux,  1'b0, over, !is_add, carry}; // ADD, ADC, SUB, SBC, CP
 
 // -----------------------------------------------------------------------------
 // Сдвиги и работа над регистром A
 // -----------------------------------------------------------------------------
 
-// Отдельно, вычисление DAA
-wire [7:0] alu_sr_daa =
+// Вычисление DAA
+wire [7:0] daa =
     (f[NF]) ? a - ((f[AF] | (a[3:0] > 4'h9)) ? 8'h06 : 0) - ((f[CF] | (a[7:0] > 8'h99)) ? 8'h60 : 0) :
               a + ((f[AF] | (a[3:0] > 4'h9)) ? 8'h06 : 0) + ((f[CF] | (a[7:0] > 8'h99)) ? 8'h60 : 0);
 
 // Промежуточное вычисление флагов результата
-wire        alu_sr_prty = ~^alu_sr[7:0];
-wire        alu_sr_zero = alu_sr[7:0] == 8'b0;
-wire [7:0]  alu_sf_daa  = {alu_sr[7], alu_sr_zero, alu_sr[5], a[4] ^ alu_sr[4], alu_sr[3], alu_sr_prty, f[NF], f[CF] | (a > 8'h99)};
+wire sr_prty = ~^alu_sr[7:0];
+wire sr_zero =   alu_sr[7:0] == 8'b0;
 
 // Вычисление сдвигов
 wire [7:0] alu_sr =
-    op53 == 3'h0 ? {a[6:0], a[  7]} : // RLCA
-    op53 == 3'h1 ? {a[0],   a[7:1]} : // RRCA
-    op53 == 3'h2 ? {a[6:0], f[ CF]} : // RLA
-    op53 == 3'h3 ? {f[CF],  a[7:1]} : // RRA
-    op53 == 3'h4 ? alu_sr_daa :       // DAA
-    op53 == 3'h5 ? ~a : a;            // CPL : (SCF, CCF)
+    op53 == ALU_RLC ? {a[6:0], a[  7]} :
+    op53 == ALU_RRC ? {a[0],   a[7:1]} :
+    op53 == ALU_RL  ? {a[6:0], f[ CF]} :
+    op53 == ALU_RR  ? {f[CF],  a[7:1]} :
+    op53 == ALU_DAA ? daa :
+    op53 == ALU_CPL ? ~a : a;
 
 // Вычисление флагов
 wire [7:0] alu_sf =
-    op53 == 3'h0 || op53 == 3'h2 ? {alu_sr[7], alu_sr_zero, 3'b000, alu_sr_prty, 1'b1, a[7]} : // RLCA, RLA
-    op53 == 3'h1 || op53 == 3'h3 ? {alu_sr[7], alu_sr_zero, 3'b000, alu_sr_prty, 1'b1, a[0]} : // RRCA, RRA
-    op53 == 3'h4 ? alu_sf_daa : // DAA
-    op53 == 3'h5 ? {f[SF], f[ZF], 3'b010, f[PF], 1'b1, f[CF]} :
-    op53 == 3'h6 ? {f[SF], f[ZF], 1'b0, f[AF], 1'b0, f[PF], 2'b11} :
-                   {f[SF], f[ZF], 1'b0, f[AF], 1'b0, f[PF], 1'b1, f[CF] ^ 1'b1};
+    op53 == ALU_RLC || op53 == ALU_RL ? {alu_sr[7], sr_zero, 3'b000, sr_prty, 1'b1, a[7]} :
+    op53 == ALU_RRC || op53 == ALU_RR ? {alu_sr[7], sr_zero, 3'b000, sr_prty, 1'b1, a[0]} :
+    op53 == ALU_DAA ? {daa[7], sr_zero, daa[5], a[4] ^ daa[4], daa[3], sr_prty, f[NF], f[CF] | (a > 8'h99)} :
+    op53 == ALU_CPL ? {f[SF], f[ZF], 1'b0, 1'b1,  1'b0, f[PF], 1'b1,  f[CF]} :
+    op53 == ALU_SCF ? {f[SF], f[ZF], 1'b0, f[AF], 1'b0, f[PF], 1'b1,   1'b1} :
+                      {f[SF], f[ZF], 1'b0, f[AF], 1'b0, f[PF], 1'b1, !f[CF]};
 
 // -----------------------------------------------------------------------------
 // Запись в регистры
@@ -631,31 +637,38 @@ wire [7:0] alu_sf =
 always @(negedge clock)
 begin
 
-    if (ex_de_hl) begin de <= hl; hl <= de; end
-    // Запись в 16-битные регистры
-    else if (_w) case (_n)
-
-        3'h0: bc <= {_u, _l};
-        3'h1: de <= {_u, _l};
-        3'h2: hl <= {_u, _l};
-        3'h3: sp <= {_u, _l};
-
-    endcase
-    // Запись в 8 битные регистры
-    else if (_b) case (_n)
-
-        3'h0: bc[15:8] <= _l;
-        3'h1: bc[ 7:0] <= _l;
-        3'h2: de[15:8] <= _l;
-        3'h3: de[ 7:0] <= _l;
-        3'h4: hl[15:8] <= _l;
-        3'h5: hl[ 7:0] <= _l;
-        3'h7: a <= _l;
-
-    endcase
-
     // Сохранение флагов
     if (fw) f <= _f;
+
+    // Сохранение регистров
+    case (spec)
+    EX_AF:    begin {a,  a_} <= {a_,  a}; end // EX AF,AF'
+    EX_DE_HL: begin {de, hl} <= {hl, de}; end // EX DE,HL
+    default:
+
+        // Запись в 16-битные регистры
+        if (_w) case (_n)
+
+            REG_BC: bc <= {_u, _l};
+            REG_DE: de <= {_u, _l};
+            REG_HL: hl <= {_u, _l};
+            REG_SP: sp <= {_u, _l};
+
+        endcase
+        // Запись в 8 битные регистры
+        else if (_b) case (_n)
+
+            REG_B: bc[15:8] <= _l;
+            REG_C: bc[ 7:0] <= _l;
+            REG_D: de[15:8] <= _l;
+            REG_E: de[ 7:0] <= _l;
+            REG_H: hl[15:8] <= _l;
+            REG_L: hl[ 7:0] <= _l;
+            REG_A: a        <= _l;
+
+        endcase
+
+    endcase
 
 end
 

@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.66 (w)1999-2015 BSI
-[*] Sun Nov 12 04:23:16 2023
+[*] Sun Nov 12 05:36:28 2023
 [*]
-[dumpfile] "tb.vcd"
-[dumpfile_mtime] "Sun Nov 12 04:22:33 2023"
-[dumpfile_size] 97501
-[savefile] "tb.gtkw"
+[dumpfile] "E:\dev\05_kr580\rtl\tb.vcd"
+[dumpfile_mtime] "Sun Nov 12 05:34:06 2023"
+[dumpfile_size] 97279
+[savefile] "E:\dev\05_kr580\rtl\tb.gtkw"
 [timestart] 0
 [size] 1280 608
 [pos] -1 -1
-*-6.000000 101 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-6.000000 80 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] tb.
 [sst_width] 197
 [signals_width] 177
@@ -46,8 +46,28 @@ tb.cpu.de[15:0]
 tb.cpu.hl[15:0]
 [color] 5
 tb.cpu.sp[15:0]
+@c00022
 [color] 5
 tb.cpu.a[7:0]
+@28
+[color] 5
+(0)tb.cpu.a[7:0]
+[color] 5
+(1)tb.cpu.a[7:0]
+[color] 5
+(2)tb.cpu.a[7:0]
+[color] 5
+(3)tb.cpu.a[7:0]
+[color] 5
+(4)tb.cpu.a[7:0]
+[color] 5
+(5)tb.cpu.a[7:0]
+[color] 5
+(6)tb.cpu.a[7:0]
+[color] 5
+(7)tb.cpu.a[7:0]
+@1401200
+-group_end
 @c00023
 [color] 5
 tb.cpu.f[7:0]
@@ -72,5 +92,23 @@ tb.cpu.f[7:0]
 -group_end
 @1000200
 -REGS
+@c00200
+-WIRE
+@22
+tb.cpu.r20[7:0]
+tb.cpu.r53[7:0]
+@1401200
+-WIRE
+@c00200
+-WRITE
+@28
+tb.cpu.fw
+tb.cpu._b
+tb.cpu._w
+@22
+tb.cpu._u[7:0]
+tb.cpu._l[7:0]
+@1401200
+-WRITE
 [pattern_trace] 1
 [pattern_trace] 0
