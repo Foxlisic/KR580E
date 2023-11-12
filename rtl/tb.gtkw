@@ -1,23 +1,24 @@
 [*]
 [*] GTKWave Analyzer v3.3.66 (w)1999-2015 BSI
-[*] Sun Nov 12 05:36:28 2023
+[*] Sun Nov 12 07:10:35 2023
 [*]
 [dumpfile] "E:\dev\05_kr580\rtl\tb.vcd"
-[dumpfile_mtime] "Sun Nov 12 05:34:06 2023"
-[dumpfile_size] 97279
+[dumpfile_mtime] "Sun Nov 12 07:10:19 2023"
+[dumpfile_size] 97220
 [savefile] "E:\dev\05_kr580\rtl\tb.gtkw"
 [timestart] 0
 [size] 1280 608
 [pos] -1 -1
-*-6.000000 80 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-6.000000 120 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] tb.
 [sst_width] 197
 [signals_width] 177
 [sst_expanded] 1
 [sst_vpaned_height] 156
-@28
-[color] 2
+@29
+[color] 3
 tb.clk
+@28
 [color] 2
 tb.clock
 @22
@@ -68,7 +69,7 @@ tb.cpu.a[7:0]
 (7)tb.cpu.a[7:0]
 @1401200
 -group_end
-@c00023
+@c00022
 [color] 5
 tb.cpu.f[7:0]
 @28
@@ -88,7 +89,7 @@ tb.cpu.f[7:0]
 (6)tb.cpu.f[7:0]
 [color] 5
 (7)tb.cpu.f[7:0]
-@1401201
+@1401200
 -group_end
 @1000200
 -REGS

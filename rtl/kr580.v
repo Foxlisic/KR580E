@@ -24,7 +24,7 @@ localparam
 // Регистры
 localparam
     REG_B  = 0, REG_C  = 1, REG_D  = 2, REG_E = 3,
-    REG_H  = 4, REG_L  = 5,             REG_A = 7,
+    REG_H  = 4, REG_L  = 5, REG_M  = 6, REG_A = 7,
     REG_BC = 0, REG_DE = 1, REG_HL = 2, REG_SP = 3;
 
 // Флаги
@@ -75,10 +75,10 @@ reg         fw;             // Писать флаги
 reg  [ 1:0] spec;           // Специальные операции; EX DE,HL; EX AF,AF'
 
 // Определение условий
-wire        reg_hl  = (_n == 3'b110);
 wire [15:0] signext = pc + 1 + {{8{in[7]}}, in[7:0]};
-wire [3:0]  cc      = {f[CF], ~f[CF], f[ZF], ~f[ZF]};
-wire        ccc     = (opcode[5:4] == 2'b00) & (f[ZF] == opcode[3]) | // NZ, Z,
+wire [7:0]  ccc     = {~f[SF], f[SF], ~f[PF], f[PF], ~f[CF], f[CF], ~f[ZF], f[ZF]};
+
+wire        ccx     = (opcode[5:4] == 2'b00) & (f[ZF] == opcode[3]) | // NZ, Z,
                       (opcode[5:4] == 2'b01) & (f[CF] == opcode[3]) | // NC, C,
                       (opcode[5:4] == 2'b10) & (f[PF] == opcode[3]) | // PO, PE
                       (opcode[5:4] == 2'b11) & (f[SF] == opcode[3]) | // P, M
@@ -97,35 +97,29 @@ wire [1:0] op54 = opcode[5:4];
 
 // Вариант 1. Источник opcode[2:0]
 wire [7:0] r20 =
-    op20 == 3'h0 ? bc[15:8] : // B
-    op20 == 3'h1 ? bc[ 7:0] : // C
-    op20 == 3'h2 ? de[15:8] : // D
-    op20 == 3'h3 ? de[ 7:0] : // E
-    op20 == 3'h4 ? hl[15:8] : // H
-    op20 == 3'h5 ? hl[ 7:0] : // L
-    op20 == 3'h6 ? in : a;    // F, A
+    op20 == REG_B ? bc[15:8] : op20 == REG_C ? bc[ 7:0] :
+    op20 == REG_D ? de[15:8] : op20 == REG_E ? de[ 7:0] :
+    op20 == REG_H ? hl[15:8] : op20 == REG_L ? hl[ 7:0] :
+    op20 == REG_M ? in : a;
 
 // Вариант 2. Источник opcode[5:3]
 wire [7:0] r53 =
-    op53 == 3'h0 ? bc[15:8] : // B
-    op53 == 3'h1 ? bc[ 7:0] : // C
-    op53 == 3'h2 ? de[15:8] : // D
-    op53 == 3'h3 ? de[ 7:0] : // E
-    op53 == 3'h4 ? hl[15:8] : // H
-    op53 == 3'h5 ? hl[ 7:0] : // L
-    op53 == 3'h6 ? in : a;    // (HL), A
+    op53 == REG_B ? bc[15:8] : op53 == REG_C ? bc[ 7:0] :
+    op53 == REG_D ? de[15:8] : op53 == REG_E ? de[ 7:0] :
+    op53 == REG_H ? hl[15:8] : op53 == REG_L ? hl[ 7:0] :
+    op53 == REG_M ? in : a;
 
 // 16-битный регистр, источник opcode[5:4]
 wire [15:0] r16 =
-    op54 == 3'h0 ? bc :
-    op54 == 3'h1 ? de :
-    op54 == 3'h2 ? hl : sp;
+    op54 == REG_BC ? bc :
+    op54 == REG_DE ? de :
+    op54 == REG_HL ? hl : sp;
 
 // 16-битные операции HL + R16
 wire [16:0] hladd = hl + r16;
 
 // Инструкции INC и DEC
-wire [8:0] r53id  = opcode[0] ? r53 - 1 : r53 + 1;  // Расчет результата
+wire [8:0] incdec = opcode[0] ? r53 - 1 : r53 + 1;  // Расчет результата
 wire       r53ido = r53 == (127 + opcode[0]);       // Флаг overflow
 
 // -----------------------------------------------------------------------------
@@ -205,7 +199,7 @@ else if (locked) begin
         // 1+ JR cc, *
         8'b00_1xx_000: case (t)
 
-            0: begin if (!cc[opcode[4:3]]) begin t <= 0; pc <= pc + 2; end end
+            0: if (ccc[opcode[4:3]]) begin t <= 0; pc <= pc + 2; end
             1: begin t <= 0; pc <= signext; end
 
         endcase
@@ -307,8 +301,8 @@ else if (locked) begin
             0: begin cp <= hl; alt <= 1; end
             1: begin
 
-                out <= r53id[7:0];
-                _f  <= {r53id[7], r53id[7:0] == 8'b0, 1'b0, r53id[4] ^ r53[4], 1'b0, r53ido, 1'b0, r53id[8]};
+                out <= incdec;
+                _f  <= {incdec[7], incdec[7:0] == 8'b0, 1'b0, incdec[4] ^ r53[4], 1'b0, r53ido, 1'b0, incdec[8]};
                 fw  <= 1;
                 we  <= 1;
                 alt <= 1;
@@ -324,18 +318,30 @@ else if (locked) begin
             t   <= 0;
             _n  <= op53;
             _b  <= 1;
-            _l  <= r53id[7:0];
-            _f  <= {r53id[7], r53id[7:0] == 8'b0, 1'b0, r53id[4] ^ r53[4], 1'b0, r53ido, 1'b0, r53id[8]};
+            _l  <= incdec;
+            _f  <= {incdec[7], incdec[7:0] == 8'b0, 1'b0, incdec[4] ^ r53[4], 1'b0, r53ido, 1'b0, incdec[8]};
             fw  <= 1;
 
         end
 
-        // 2* LD r, i8
+        // 2+ LD r, i8
         8'b00_xxx_110: case (t)
 
-            0: begin _n <= op53; cp <= hl; end
-            1: begin t <= reg_hl ? 2 : 0; pc <= pc + 1; _b <= ~reg_hl; we <= reg_hl; _l <= in; out <= in; alt <= 1; end
-            2: begin t <= 0; end
+            0: cp <= hl;
+            1: begin
+
+                t   <= op53 == REG_M ? 2 : 0;
+                we  <= op53 == REG_M;
+                alt <= op53 == REG_M;
+                _b  <= op53 != REG_M;
+                _n  <= op53;
+                _l  <= in;
+                out <= in;
+                pc  <= pc + 1;
+
+            end
+
+            2: t <= 0;
 
         endcase
 
