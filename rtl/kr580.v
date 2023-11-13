@@ -1,17 +1,18 @@
 module kr580(
 
     // Шина данных
-    input                clock,
-    input                reset_n,
-    input                locked,
-    input        [ 7:0]  in,
-    output       [15:0]  address,   // Указатель на адрес
-    output  reg          we,        // Разрешить запись (высокий уровень)
-    output  reg          pw,        // Port Write
-    output  reg  [ 7:0]  out,
+    input               clock,
+    input               reset_n,
+    input               locked,
+    input        [ 7:0] in,
+    output       [15:0] address,    // Указатель на адрес
+    output  reg         we,         // Разрешить запись (высокий уровень)
+    output  reg         pw,         // Port write
+    output  reg         pr,         // Port read (на IN значение порта address)
+    output  reg  [ 7:0] out,
 
     // Interrupt
-    input   wire         intr
+    input   wire        intr
 );
 
 // Набор АЛУ
@@ -135,6 +136,7 @@ else if (locked) begin
     _w   <= 1'b0;
     we   <= 1'b0;
     pw   <= 1'b0;
+    pr   <= 1'b0;
     fw   <= 1'b0;
     spec <= 1'b0;
 
@@ -160,10 +162,10 @@ else if (locked) begin
         // Запись опкода на первом такте
         if (t == 0) begin
 
-            irq   <= 0;           // Сброс IRQ вектора
-            latch <= in;          // Запомнить опкод
-            ei    <= ei_;         // Сброс EI-триггера
-            pc    <= pc + 1;
+            irq   <= 0;         // Сброс IRQ вектора
+            latch <= in;        // Запомнить опкод
+            ei    <= ei_;       // Сброс EI-триггера
+            pc    <= pc + 1;    // По умолчанию PC+1 на T=0
 
         end
 
@@ -463,18 +465,27 @@ else if (locked) begin
 
         endcase
 
-        // 2 OUT (*), A
+        // 3 OUT (*), A
         8'b11_010_011: case (t)
 
-            1: begin t <= 0; pc <= pc + 1; cp <= in; alt <= 1; out <= a; pw <= 1; end
+            1: begin
+
+                pw  <= 1;
+                alt <= 1;
+                cp  <= in;
+                pc  <= pc + 1;
+                out <= a;
+
+            end
+            2: t <= 0;
 
         endcase
 
         // 3 IN  A, (*)
         8'b11_011_011: case (t)
 
-            1: begin t <= 2; pc <= pc + 1; cp <= in; alt <= 1; end
-            2: begin t <= 0; _l <= in; _b <= 1; _n <= REG_A; end
+            1: begin pc <= pc + 1; cp <= in; pr <= 1; alt <= 1; end
+            2: begin _b <= 1; _n <= REG_A; _l <= in; t <= 0; end
 
         endcase
 
@@ -528,13 +539,11 @@ else if (locked) begin
 
             0: begin
 
-                alt <= 1;
-                we  <= 1;
-                cp  <= sp - 1;
-                out <= (op54 == 2'b11) ? a : r16[15:8];
-                _w  <= 1;
-                _n  <= REG_SP;
-                {_u, _l} <= sp - 2;
+                alt  <= 1;
+                we   <= 1;
+                cp   <= sp - 1;
+                out  <= (op54 == 2'b11) ? a : r16[15:8];
+                spec <= DECSP2;
 
             end
 
@@ -570,13 +579,12 @@ else if (locked) begin
 
         endcase
 
-        // 4 RST #
+        // 3 RST #
         8'b11_xxx_111: case (t)
 
-            0: begin cp <= sp; end
-            1: begin t <= 2; out <= pc[15:8]; we <= 1; cp <= cp - 1; alt <= 1; end
-            2: begin t <= 3; out <= pc[ 7:0]; we <= 1; cp <= cp - 1; alt <= 1; end
-            3: begin t <= 0; _w <= 1; _n <= REG_SP; {_u, _l} <= cp; pc <= {op53, 3'b000}; end
+            0: begin out <= pci[15:8]; cp <= sp - 1; we <= 1; alt <= 1; end
+            1: begin out <= pc [ 7:0]; cp <= cp - 1; we <= 1; alt <= 1; end
+            2: begin spec <= DECSP2; pc <= {op53, 3'b000}; t <= 0; end
 
         endcase
 

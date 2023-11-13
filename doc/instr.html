@@ -258,35 +258,35 @@
         <!--3--><td class="ok"><b>JP</b>nn</td>
         <!--4--><td class="ok"><b>CALL</b>NZ,nn</td>
         <!--5--><td class="ok"><b>PUSH</b>BC</td>
-        <!--6--><td><b></b></td>
-        <!--7--><td><b></b></td>
+        <!--6--><td class="ok"><b>ADD</b>n</td>
+        <!--7--><td class="ok"><b>RST</b>#00</td>
         <!--8--><td class="ok"><b>RET</b>Z</td>
         <!--9--><td class="ok"><b>RET</b></td>
         <!--2--><td class="ok"><b>JP</b>Z,nn</td>
-        <!--B--><td><b></b></td>
+        <!--B--><td class="none"><b>CB</b></td>
         <!--C--><td class="ok"><b>CALL</b>Z,nn</td>
         <!--D--><td class="ok"><b>CALL</b>nn</td>
-        <!--E--><td><b></b></td>
-        <!--F--><td><b></b></td>
+        <!--E--><td class="ok"><b>ADC</b>n</td>
+        <!--F--><td class="ok"><b>RST</b>#08</td>
     </tr>
     <tr><!-- D0 -->
         <th>D</th>
         <!--0--><td class="ok"><b>RET</b>NC</td>
         <!--1--><td class="ok"><b>POP</b>DE</td>
         <!--2--><td class="ok"><b>JP</b>NC,nn</td>
-        <!--3--><td><b></b></td>
+        <!--3--><td class="ok"><b>OUT</b>(n),A</td>
         <!--4--><td class="ok"><b>CALL</b>NC,nn</td>
         <!--5--><td class="ok"><b>PUSH</b>DE</td>
-        <!--6--><td><b></b></td>
-        <!--7--><td><b></b></td>
+        <!--6--><td class="ok"><b>SUB</b>n</td>
+        <!--7--><td class="ok"><b>RST</b>#10</td>
         <!--8--><td class="ok"><b>RET</b>C</td>
         <!--9--><td class="ok"><b>EXX</b></td>
         <!--A--><td class="ok"><b>JP</b>C,nn</td>
-        <!--B--><td><b></b></td>
+        <!--B--><td class="ok"><b>IN</b>A,(*)</td>
         <!--C--><td class="ok"><b>CALL</b>C,nn</td>
-        <!--D--><td><b></b></td>
-        <!--E--><td><b></b></td>
-        <!--F--><td><b></b></td>
+        <!--D--><td class="none"><b>IX</b></td>
+        <!--E--><td class="ok"><b>SBC</b>n</td>
+        <!--F--><td class="ok"><b>RST</b>#18</td>
     </tr>
     <tr><!-- E0 -->
         <th>E</th>
@@ -296,35 +296,35 @@
         <!--3--><td class="ok"><b>EX</b>(SP),HL</td>
         <!--4--><td class="ok"><b>CALL</b>PO,nn</td>
         <!--5--><td class="ok"><b>PUSH</b>HL</td>
-        <!--6--><td><b></b></td>
-        <!--7--><td><b></b></td>
+        <!--6--><td class="ok"><b>AND</b>n</td>
+        <!--7--><td class="ok"><b>RST</b>#20</td>
         <!--8--><td class="ok"><b>RET</b>PE</td>
         <!--9--><td class="ok"><b>JP</b>(HL)</td>
-        <!--2--><td class="ok"><b>JP</b>PE,nn</td>
-        <!--B--><td><b></b></td>
+        <!--A--><td class="ok"><b>JP</b>PE,nn</td>
+        <!--B--><td class="ok"><b>EX</b>DE,HL</td>
         <!--C--><td class="ok"><b>CALL</b>PE,nn</td>
-        <!--D--><td><b></b></td>
-        <!--E--><td><b></b></td>
-        <!--F--><td><b></b></td>
+        <!--D--><td class="none"><b>ED</b></td>
+        <!--E--><td class="ok"><b>XOR</b>n</td>
+        <!--F--><td class="ok"><b>RST</b>#28</td>
     </tr>
     <tr><!-- F0 -->
         <th>F</th>
         <!--0--><td class="ok"><b>RET</b>P</td>
         <!--1--><td class="ok"><b>POP</b>AF</td>
         <!--2--><td class="ok"><b>JP</b>P,nn</td>
-        <!--3--><td><b></b></td>
+        <!--3--><td class="ok"><b>DI</b></td>
         <!--4--><td class="ok"><b>CALL</b>P,nn</td>
         <!--5--><td class="ok"><b>PUSH</b>AF</td>
-        <!--6--><td><b></b></td>
-        <!--7--><td><b></b></td>
+        <!--6--><td class="ok"><b>OR</b>n</td>
+        <!--7--><td class="ok"><b>RST</b>#30</td>
         <!--8--><td class="ok"><b>RET</b>M</td>
         <!--9--><td class="ok"><b>LD</b>SP,HL</td>
         <!--A--><td class="ok"><b>JP</b>M,nn</td>
-        <!--B--><td><b></b></td>
+        <!--B--><td class="ok"><b>EI</b></td>
         <!--C--><td class="ok"><b>CALL</b>M,nn</td>
-        <!--D--><td><b></b></td>
-        <!--E--><td><b></b></td>
-        <!--F--><td><b></b></td>
+        <!--D--><td class="none"><b>IY</b></td>
+        <!--E--><td class="ok"><b>CP</b>n</td>
+        <!--F--><td class="ok"><b>RST</b>#38</td>
     </tr>
 </table>
 
