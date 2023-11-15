@@ -12,7 +12,7 @@ reg         clk, clock;
 always #0.5 clk         = ~clk;
 always #2.0 clock       = ~clock;
 
-initial begin clk = 1; clock = 0; #20 pin_intr = 1'b0; #2500 $finish; end
+initial begin pin_intr = 0; clk = 1; clock = 0; #2 pin_intr = 1'b1; #2500 $finish; end
 initial begin $dumpfile("tb.vcd"); $dumpvars(0, tb); end
 
 // ---------------------------------------------------------------------
@@ -27,11 +27,10 @@ initial $readmemh("tb.hex", memory, 16'h0000);
 /* Формируется логика чтения и записи в память */
 always @(posedge clk) begin in <= memory[address]; if (we) memory[address] <= out; end
 
-wire [7:0] pin_pa;
-wire [7:0] pin_pi = 0;
+wire [7:0] pin_pi;
 wire [7:0] pin_po;
-wire       pin_pw;
-reg        pin_intr = 1'b0;
+wire       pin_pw, pin_pr;
+reg        pin_intr;
 
 // ---------------------------------------------------------------------
 
@@ -46,6 +45,7 @@ kr580 cpu(
     .out        (out),
     // ---
     .pw         (pin_pw),
+    .pr         (pin_pr),
     .intr       (pin_intr)
 );
 
