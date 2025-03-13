@@ -1,20 +1,20 @@
 [*]
 [*] GTKWave Analyzer v3.3.66 (w)1999-2015 BSI
-[*] Wed Nov 15 05:40:49 2023
+[*] Sat Feb 03 16:36:12 2024
 [*]
 [dumpfile] "e:\dev\05_kr580\rtl\tb.vcd"
-[dumpfile_mtime] "Wed Nov 15 05:40:20 2023"
-[dumpfile_size] 105780
+[dumpfile_mtime] "Sat Feb 03 16:34:45 2024"
+[dumpfile_size] 217142
 [savefile] "e:\dev\05_kr580\rtl\tb.gtkw"
 [timestart] 0
-[size] 1280 608
+[size] 1280 606
 [pos] -1 -1
-*-7.000000 190 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-7.000000 63 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] tb.
 [sst_width] 197
 [signals_width] 177
 [sst_expanded] 1
-[sst_vpaned_height] 156
+[sst_vpaned_height] 155
 @28
 [color] 3
 tb.clk
@@ -38,9 +38,9 @@ tb.cpu.pr
 tb.we
 @1000200
 -IFACE
-@800200
+@800201
 -REGS
-@22
+@23
 [color] 5
 tb.cpu.bc[15:0]
 [color] 5
@@ -49,7 +49,7 @@ tb.cpu.de[15:0]
 tb.cpu.hl[15:0]
 [color] 5
 tb.cpu.sp[15:0]
-@c00022
+@c00023
 [color] 5
 tb.cpu.a[7:0]
 @28
@@ -69,9 +69,9 @@ tb.cpu.a[7:0]
 (6)tb.cpu.a[7:0]
 [color] 5
 (7)tb.cpu.a[7:0]
-@1401200
+@1401201
 -group_end
-@c00022
+@c00023
 [color] 5
 tb.cpu.f[7:0]
 @28
@@ -91,9 +91,9 @@ tb.cpu.f[7:0]
 (6)tb.cpu.f[7:0]
 [color] 5
 (7)tb.cpu.f[7:0]
-@1401200
+@1401201
 -group_end
-@c00200
+@c00201
 -EXT
 @22
 [color] 6
@@ -106,17 +106,17 @@ tb.cpu.bc_[15:0]
 tb.cpu.de_[15:0]
 [color] 6
 tb.cpu.hl_[15:0]
-@1401200
+@1401201
 -EXT
-@1000200
+@1000201
 -REGS
-@800200
+@c00200
 -INTR
 @28
 tb.cpu.intrp
 tb.cpu.ei
 tb.cpu.ei_
-@1000200
+@1401200
 -INTR
 @c00200
 -WIRE
@@ -129,7 +129,7 @@ tb.cpu.op54[1:0]
 tb.cpu.op20[2:0]
 @1401200
 -WIRE
-@800200
+@c00200
 -WRITE
 @28
 tb.cpu.fw
@@ -138,7 +138,7 @@ tb.cpu._w
 @22
 tb.cpu._u[7:0]
 tb.cpu._l[7:0]
-@1000200
+@1401200
 -WRITE
 [pattern_trace] 1
 [pattern_trace] 0

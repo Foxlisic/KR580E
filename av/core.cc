@@ -101,11 +101,14 @@ void App::pset(int x, int y, Uint32 cl) {
 // Печать символа
 void App::printc(int x, int y, char c) {
 
-    for (int i = 0; i < 16; i++)
+    for (int i = 0; i < 8; i++)
     for (int j = 0; j < 8; j++) {
 
-        int cl = (font[16*(unsigned char)c + i] & (1 << (7-j))) ? fore : back;
-        if (cl >= 0) pset(x + j, y + i, cl);
+        int cl = (font8[8*(unsigned char)c + i] & (1 << (7-j))) ? fore : back;
+        if (cl >= 0) {
+            pset(8*x + j, 16*y + 2*i,   cl);
+            pset(8*x + j, 16*y + 2*i+1, cl);
+        }
     }
 }
 
@@ -115,7 +118,7 @@ void App::print(const char* msg, int x = 0, int y = 0) {
     int i = 0;
     while (msg[i]) {
 
-        printc(x + i*8, y, msg[i]);
+        printc(x + i, y, msg[i]);
         i++;
     }
 }

@@ -141,13 +141,13 @@ else if (locked) begin
     // Запуск прерывания RST #38; IM 2 режима нет
     if (t == 0 && ei && (intrp != intr)) begin
 
-        t       <= 1;
-        alt     <= 1;
-        we      <= 1;
-        cp      <= sp - 1;
-        intrp   <= intr;
-        out     <= (in == 8'h76) ? pci[15:8] : pc[15:7]; // HALT?
-        latch   <= 8'hFF;
+        t        <= 1;
+        alt      <= 1;
+        we       <= 1;
+        cp       <= sp - 1;
+        intrp    <= intr;
+        out      <= (in == 8'h76) ? pci[15:8] : pc[15:7]; // HALT?
+        latch    <= 8'hFF;
         {ei,ei_} <= 0;
 
         // HALT добавляет PC+1
@@ -168,7 +168,10 @@ else if (locked) begin
 
         end
 
-        // Выполнять инструкции
+        // ---------------------------------------------------------------------
+        // Интерпретатор
+        // ---------------------------------------------------------------------
+
         casex (opcode)
 
         // 1 NOP
@@ -186,20 +189,19 @@ else if (locked) begin
                 _n <= REG_B;
                 _l <= bc[15:8] - 1;
 
-                if (bc[15:8] == 1) pc <= pc + 2;
+                if (bc[15:8] == 1) begin pc <= pc + 2; t <= 0; end
 
             end
             1: begin t <= 0; pc <= pcn; end
 
         endcase
 
-        // 2 JR *
-        8'b00_011_000: if (t == 1) begin t <= 0; pc <= pcn; end
-
+        // 2  JR *
         // 1+ JR cc, *
+        8'b00_011_000,
         8'b00_1xx_000: case (t)
 
-            0: if (!ccc[opcode[4:3]]) begin t <= 0; pc <= pc + 2; end
+            0: if (!ccc[opcode[4:3]] && opcode[5]) begin t <= 0; pc <= pc + 2; end
             1: begin t <= 0; pc <= pcn; end
 
         endcase
@@ -683,12 +685,9 @@ begin
         // Запись в 8 битные регистры
         else if (_b) case (_n)
 
-            REG_B: bc[15:8] <= _l;
-            REG_C: bc[ 7:0] <= _l;
-            REG_D: de[15:8] <= _l;
-            REG_E: de[ 7:0] <= _l;
-            REG_H: hl[15:8] <= _l;
-            REG_L: hl[ 7:0] <= _l;
+            REG_B: bc[15:8] <= _l; REG_C: bc[ 7:0] <= _l;
+            REG_D: de[15:8] <= _l; REG_E: de[ 7:0] <= _l;
+            REG_H: hl[15:8] <= _l; REG_L: hl[ 7:0] <= _l;
             REG_A: a        <= _l;
 
         endcase
