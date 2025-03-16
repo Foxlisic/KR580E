@@ -1,3 +1,9 @@
+/* verilator lint_off WIDTHTRUNC */
+/* verilator lint_off WIDTHEXPAND */
+/* verilator lint_off CASEX */
+/* verilator lint_off CASEOVERLAP */
+/* verilator lint_off CASEINCOMPLETE */
+
 module kr580
 (
     // Шина данных

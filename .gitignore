@@ -1,3 +1,6 @@
 rtl/*.vcd
 rtl/*.qqq
 *.exe
+*.log
+kr580e
+obj_dir/
