@@ -17,9 +17,19 @@ module kr580
     output  reg         pr,         // Port read (на IN значение порта address)
     output  reg  [ 7:0] out,
 
+    // Регистры
+    output  reg  [15:0] pc,
+    output  reg  [15:0] sp,
+    output  reg  [15:0] bc,
+    output  reg  [15:0] de,
+    output  reg  [15:0] hl,
+    output       [15:0] af,
+
     // Interrupt
     input   wire        intr
 );
+
+assign af = {a, f};
 
 // Набор АЛУ
 localparam
@@ -57,9 +67,7 @@ reg  [15:0] cp      = 0;
 reg         alt     = 1'b0;     // =0 pc  =1 cp
 
 // Регистры. Есть также регистры AF'BC'DE'HL' из дополнительного набора
-reg  [15:0] bc  = 16'hAFB1, de  = 16'h0305, hl  = 16'hBEEF; // Базовый
 reg  [15:0] bc_ = 16'h0000, de_ = 16'h0000, hl_ = 16'h0000; // Дополнительный
-reg  [15:0] pc  = 16'h0000, sp  = 16'h0001;
 reg  [ 1:0] im  = 2'b00;
 reg  [ 7:0] i   = 8'h00,
             a   = 8'h0A,       a_ = 8'hFF,
